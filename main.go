@@ -5,14 +5,22 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
-	"github.com/mrbrist/pokedex-go/api"
+	"github.com/mrbrist/pokedex-go/internal/api"
+	"github.com/mrbrist/pokedex-go/internal/pokecache"
 )
+
+type config struct {
+	Next     string
+	Previous string
+	cache    *pokecache.Cache
+}
 
 type cliCommand struct {
 	name        string
 	description string
-	callback    func() error
+	callback    func(*config) error
 }
 
 var commands map[string]cliCommand
@@ -34,12 +42,22 @@ func main() {
 			description: "Displays the next 20 locations of the Pokemon map",
 			callback:    commandMap,
 		},
+		"mapb": {
+			name:        "mapb",
+			description: "Displays the previous 20 locations of the Pokemon map",
+			callback:    commandMapb,
+		},
 	}
 
 	scanner := bufio.NewScanner(os.Stdin)
 
 	if err := scanner.Err(); err != nil {
 		fmt.Println("Error reading input:", err)
+	}
+
+	cfg := config{
+		Next:  "https://pokeapi.co/api/v2/location-area",
+		cache: pokecache.NewCache(5 * time.Second),
 	}
 
 	for {
@@ -50,7 +68,7 @@ func main() {
 			if !ok {
 				fmt.Println("Unknown command")
 			} else {
-				c.callback()
+				c.callback(&cfg)
 			}
 		}
 	}
@@ -69,13 +87,13 @@ func cleanInput(text string) []string {
 	return words
 }
 
-func commandExit() error {
+func commandExit(cfg *config) error {
 	fmt.Println("Closing the Pokedex... Goodbye!")
 	os.Exit(0)
 	return nil
 }
 
-func commandHelp() error {
+func commandHelp(cfg *config) error {
 	fmt.Println("Welcome to the Pokedex!")
 	fmt.Println("Usage:")
 	for _, c := range commands {
@@ -84,7 +102,28 @@ func commandHelp() error {
 	return nil
 }
 
-func commandMap() error {
-	api.Map()
+func commandMap(cfg *config) error {
+	la := api.GetLocationAreas(cfg.cache, cfg.Next)
+	cfg.Next = la.Next
+	cfg.Previous = la.Previous
+
+	for _, loc := range la.Results {
+		fmt.Println(loc.Name)
+	}
+	return nil
+}
+
+func commandMapb(cfg *config) error {
+	if cfg.Previous == "" {
+		fmt.Println("You are on the first page")
+	} else {
+		la := api.GetLocationAreas(cfg.cache, cfg.Previous)
+		cfg.Next = la.Next
+		cfg.Previous = la.Previous
+
+		for _, loc := range la.Results {
+			fmt.Println(loc.Name)
+		}
+	}
 	return nil
 }
