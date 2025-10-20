@@ -59,3 +59,11 @@ func TestReapLoop(t *testing.T) {
 		return
 	}
 }
+
+func TestNewCache(t *testing.T) {
+	cache := NewCache(5 * time.Second)
+	if cache.entries == nil {
+		t.Errorf("Could not create new cache")
+		return
+	}
+}
